@@ -1,40 +1,63 @@
-import numpy as np
 import pandas as pd
-from sklearn.model_selection import train_test_split
-from sklearn.linear_model import LogisticRegression
-from sklearn.metrics import accuracy_score
+from scipy.stats import poisson
 
-# Dados fictícios
-dados = {
-    'TimeCasa': [1, 0, 1, 1, 0, 1, 0, 1, 0, 1],
-    'TimeVisitante': [0, 1, 0, 0, 1, 0, 1, 0, 1, 0],
-    'RankingTimeCasa': [1, 2, 1, 1, 3, 2, 4, 1, 5, 1],
-    'RankingTimeVisitante': [2, 1, 3, 4, 1, 3, 2, 5, 1, 4],
-    'VitoriaTimeCasa': [1, 0, 1, 1, 0, 1, 0, 1, 0, 1]  # 1 se o time da casa ganhou, 0 caso contrário
-}
+def calcular_probabilidade_vitoria(media_gols_time1, media_gols_time2):
+    max_gols = 10  # Número máximo de gols a considerar para a probabilidade
+    prob_vitoria_time1 = 0
+    prob_vitoria_time2 = 0
+    prob_empate = 0
+    
+    for i in range(max_gols):
+        for j in range(max_gols):
+            prob_i = poisson.pmf(i, media_gols_time1)
+            prob_j = poisson.pmf(j, media_gols_time2)
+            if i > j:
+                prob_vitoria_time1 += prob_i * prob_j
+            elif i < j:
+                prob_vitoria_time2 += prob_i * prob_j
+            else:
+                prob_empate += prob_i * prob_j
+    
+    return prob_vitoria_time1, prob_empate, prob_vitoria_time2
 
-# Criação do DataFrame
-df = pd.DataFrame(dados)
+def obter_resultados_ultimos_5_jogos(time):
+    placares_casa = []
+    placares_fora = []
+    for i in range(5):
+        resultado = input(f'Informe o resultado do jogo {i+1} do {time} (formato "casa x-y fora" ou deixe em branco se não ocorreu): ')
+        if resultado.strip():  # Verifica se a entrada não está vazia
+            casa, fora = map(int, resultado.split()[0].split('-'))
+            placares_casa.append(casa)
+            placares_fora.append(fora)
+        else:
+            placares_casa.append(None)  # Usa None para jogos não ocorridos
+            placares_fora.append(None)
+    return placares_casa, placares_fora
 
-# Definindo variáveis independentes (X) e a variável dependente (y)
-X = df[['TimeCasa', 'TimeVisitante', 'RankingTimeCasa', 'RankingTimeVisitante']]
-y = df['VitoriaTimeCasa']
+def main():
+    time1 = input('Informe o nome do primeiro time: ')
+    print(f'Informe os resultados dos últimos 5 jogos do {time1}:')
+    placares_casa_time1, placares_fora_time1 = obter_resultados_ultimos_5_jogos(time1)
+    
+    time2 = input('Informe o nome do segundo time: ')
+    print(f'Informe os resultados dos últimos 5 jogos do {time2}:')
+    placares_casa_time2, placares_fora_time2 = obter_resultados_ultimos_5_jogos(time2)
+    
+    # Calcular as médias de gols por jogo dos últimos jogos que ocorreram
+    gols_time1 = [g for g in placares_casa_time1 if g is not None]
+    gols_time2 = [g for g in placares_fora_time2 if g is not None]
+    
+    media_gols_time1 = sum(gols_time1) / len(gols_time1) if gols_time1 else 0
+    media_gols_time2 = sum(gols_time2) / len(gols_time2) if gols_time2 else 0
+    
+    # Calcular a probabilidade de vitória
+    if media_gols_time1 > 0 and media_gols_time2 > 0:
+        prob_vitoria_time1, prob_empate, prob_vitoria_time2 = calcular_probabilidade_vitoria(media_gols_time1, media_gols_time2)
+        print(f'Probabilidade de vitória do {time1}: {prob_vitoria_time1:.2f}')
+        print(f'Probabilidade de empate: {prob_empate:.2f}')
+        print(f'Probabilidade de vitória do {time2}: {prob_vitoria_time2:.2f}')
+    else:
+        print('Não há jogos suficientes para calcular as probabilidades.')
 
-# Dividindo os dados em conjuntos de treinamento e teste
-X_treino, X_teste, y_treino, y_teste = train_test_split(X, y, test_size=0.3, random_state=42)
-
-# Criação do modelo de regressão logística
-modelo = LogisticRegression()
-modelo.fit(X_treino, y_treino)
-
-# Fazendo previsões no conjunto de teste
-y_pred = modelo.predict(X_teste)
-
-# Calculando a acurácia do modelo
-acuracia = accuracy_score(y_teste, y_pred)
-print(f'Acurácia do modelo: {acuracia * 100:.2f}%')
-
-# Prevendo a probabilidade de vitória do time da casa para um novo jogo
-novo_jogo = np.array([[1, 0, 1, 2]])  # Exemplo: time da casa, não time visitante, ranking 1 para casa, ranking 2 para visitante
-probabilidade_vitoria = modelo.predict_proba(novo_jogo)[0][1]  # Probabilidade do time da casa ganhar
-print(f'Probabilidade do time da casa ganhar: {probabilidade_vitoria * 100:.2f}%')
+if __name__ == "__main__":
+    main()
